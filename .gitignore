@@ -2,6 +2,9 @@
 fashion.db
 uploads/
 
+# 配置文件（含 API Key，不提交）
+config.py
+
 # Python
 __pycache__/
 *.pyc

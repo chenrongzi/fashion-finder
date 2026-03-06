@@ -1,8 +1,9 @@
 import os
 
-# ── 本地开发直接改这里 ───────────────────────────────────
+# ── 本地开发：直接修改这里 ───────────────────────────────
+# 部署到云端：通过环境变量注入，不需要改此文件
 
-API_KEY  = os.environ.get("API_KEY",  "sk-gqlYnF9vIbhFGxACwyU6OyA8Qqx3aLfmDGbI0RQS4uOf7Rdg")
+API_KEY  = os.environ.get("API_KEY",  "在这里填你的API Key")
 BASE_URL = os.environ.get("BASE_URL", "https://x666.me/v1")
 MODEL    = os.environ.get("MODEL",    "gemini-3-flash-preview")
 
