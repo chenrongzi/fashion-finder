@@ -1,0 +1,13 @@
+# 数据文件
+fashion.db
+uploads/
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# 编辑器
+.DS_Store
+.idea/
+.vscode/

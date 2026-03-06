@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>找图助手 🌸</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<header>
+  <h1>🌸 找图助手</h1>
+  <div class="stats" id="statsBar">加载中...</div>
+</header>
+
+<!-- Tab 导航 -->
+<nav class="tabs">
+  <button class="tab active" data-tab="upload">上传图片</button>
+  <button class="tab" data-tab="gallery">图库</button>
+</nav>
+
+<!-- ── 上传页 ── -->
+<section id="tab-upload" class="tab-content active">
+
+  <!-- 上传区域 -->
+  <div class="upload-card">
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-icon">📷</div>
+      <div class="upload-text">点击选择图片<br><small>支持从相册选择</small></div>
+      <input type="file" id="fileInput" accept="image/*" multiple hidden>
+    </div>
+
+    <!-- URL 抓取 -->
+    <div class="url-row">
+      <input type="text" id="urlInput" placeholder="或者粘贴图片链接（小红书/淘宝）" />
+      <button id="fetchBtn">抓取</button>
+    </div>
+
+    <!-- 来源平台 -->
+    <div class="platform-row">
+      <label>来源：</label>
+      <select id="platformSelect">
+        <option value="小红书">小红书</option>
+        <option value="淘宝">淘宝</option>
+        <option value="Instagram">Instagram</option>
+        <option value="其他">其他</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- 分析结果 -->
+  <div id="analysisResult" class="analysis-card hidden"></div>
+
+  <!-- 批量进度条 -->
+  <div id="progressArea" class="progress-area hidden">
+    <div class="progress-header">
+      <span id="progressText">准备中...</span>
+      <span id="progressEta"></span>
+    </div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+  </div>
+
+  <!-- 上传进度列表 -->
+  <div id="uploadQueue"></div>
+
+</section>
+
+<!-- ── 图库页 ── -->
+<section id="tab-gallery" class="tab-content">
+
+  <!-- 筛选栏 -->
+  <div class="filter-bar">
+    <button class="filter-btn active" data-status="">全部</button>
+    <button class="filter-btn" data-status="pending">待审核</button>
+    <button class="filter-btn" data-status="sent">已发老板娘</button>
+    <button class="filter-btn" data-status="approved">通过 ✅</button>
+    <button class="filter-btn" data-status="rejected">拒绝 ❌</button>
+    <button class="filter-btn select-toggle" id="selectModeBtn">多选</button>
+  </div>
+
+  <div id="gallery" class="gallery-grid"></div>
+  <div id="galleryEmpty" class="empty-tip hidden">暂无图片</div>
+  <button id="loadMoreBtn" class="load-more hidden">加载更多</button>
+
+</section>
+
+<!-- ── 批量操作底栏 ── -->
+<div id="batchBar" class="batch-bar hidden">
+  <span id="batchCount">已选 0 张</span>
+  <div class="batch-actions">
+    <button id="batchSelectAll">全选</button>
+    <button id="batchDelete" class="danger">删除</button>
+    <button id="batchCancel">取消</button>
+  </div>
+</div>
+
+<!-- ── 图片详情弹窗 ── -->
+<div id="modal" class="modal hidden">
+  <div class="modal-backdrop" id="modalBackdrop"></div>
+  <div class="modal-card">
+    <button class="modal-close" id="modalClose">✕</button>
+    <img id="modalImg" src="" alt="">
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
