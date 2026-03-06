@@ -21,7 +21,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from config import DATA_DIR
+import os
+DATA_DIR = os.environ.get("DATA_DIR", str(Path(__file__).parent))
 
 UPLOAD_DIR = Path(DATA_DIR) / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

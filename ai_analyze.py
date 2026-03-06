@@ -1,7 +1,11 @@
 import base64
 import json
+import os
 from openai import OpenAI
-from config import API_KEY, BASE_URL, MODEL
+
+API_KEY  = os.environ.get("API_KEY",  "")
+BASE_URL = os.environ.get("BASE_URL", "https://x666.me/v1")
+MODEL    = os.environ.get("MODEL",    "gemini-3-flash-preview")
 
 PROMPT = """你是专业女装设计师助手。分析这张服装图片，只返回一行紧凑JSON，不要换行不要空格不要代码块：
 {"tags":["标签1","标签2","标签3"],"style":"风格描述15字内","color":"主色调","category":"品类","notes":"设计亮点40字内"}

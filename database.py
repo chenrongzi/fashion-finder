@@ -1,7 +1,8 @@
 import sqlite3
+import os
 from pathlib import Path
-from config import DATA_DIR
 
+DATA_DIR = os.environ.get("DATA_DIR", str(Path(__file__).parent))
 DB_PATH = Path(DATA_DIR) / "fashion.db"
 
 
