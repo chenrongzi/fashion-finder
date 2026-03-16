@@ -242,17 +242,30 @@ REFINE_KEYWORDS = {
     "summer":  "夏季 轻薄 夏款",
 }
 
-KEYWORD_PROMPT = """你是专业女装设计师助手。根据以下图片分析信息，生成3-5个适合在Google图片搜索的中文关键词组合（每组不超过10字），用于寻找相似风格的服装参考图。
-只返回JSON数组，不要其他内容，格式：["关键词组1","关键词组2","关键词组3"]
+KEYWORD_PROMPT = """你是专业女装设计师，帮设计师在Google图片上找参考图。
+
+根据以下图片信息，生成4个搜索关键词组合，用于Google图片搜索。
+
+要求：
+1. 每组关键词要具体，包含【具体单品名称】+【氛围/风格词】，不要只写风格标签
+2. 中英文混搭效果更好（比如"法式碎花连衣裙 editorial"比"法式风格"好得多）
+3. 加上场景词/平台词：lookbook、outfit、editorial、ins风、穿搭、小红书风、
+4. 品类要对上目标品类：{target_category}
+5. 如果有调整方向"{refine}"，体现在关键词里（比如"设计师款""小众""2024新款"）
+6. 禁止直接把风格描述原封不动写成关键词（"法式慵懒风"这种太宽泛，没用）
 
 图片信息：
-- 风格：{style}
+- 风格描述：{style}
 - 标签：{tags}
 - 品类：{category}
 - 色调：{color}
 - 设计亮点：{notes}
-- 目标品类：{target_category}
-- 调整方向：{refine}"""
+
+只返回JSON数组，4个元素，不要其他内容：
+["关键词组1","关键词组2","关键词组3","关键词组4"]
+
+示例（法式复古连衣裙，找同款）：
+["法式复古碎花连衣裙 小众设计","vintage floral midi dress editorial","慵懒法式穿搭 氛围感outfit","French girl dress lookbook ins风"]"""
 
 
 def generate_keywords(img: dict, target_category: str, refine: str) -> list[str]:
@@ -267,7 +280,7 @@ def generate_keywords(img: dict, target_category: str, refine: str) -> list[str]
         color=img.get("ai_color", ""),
         notes=img.get("ai_notes", ""),
         target_category=cat_label,
-        refine=refine_label or "无特殊要求",
+        refine=refine_label or "无",
     )
 
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
@@ -356,9 +369,9 @@ def extend_search(req: ExtendReq):
 
     results = []
     seen_urls = set()
-    for kw in keywords[:3]:  # 最多用3个关键词，每个搜8张
-        query = f"{kw} {cat_suffix} {refine_suffix}".strip()
-        items = serper_search(query, num=8)
+    for kw in keywords[:4]:  # 4个关键词，每个搜10张
+        query = kw  # 关键词本身已包含品类和refine信息
+        items = serper_search(query, num=10)
         for item in items:
             url = item["image_url"]
             if url and url not in seen_urls:
