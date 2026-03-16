@@ -27,14 +27,23 @@ def init_db():
             ai_color TEXT DEFAULT '',
             ai_category TEXT DEFAULT '',
             ai_notes TEXT DEFAULT '',
+            ai_fabric TEXT DEFAULT '',
+            ai_silhouette TEXT DEFAULT '',
+            ai_details TEXT DEFAULT '[]',
             user_notes TEXT DEFAULT '',
             is_favorite INTEGER DEFAULT 0
         )
     """)
     # 兼容旧数据库：补充字段（若已存在则忽略）
-    try:
-        conn.execute("ALTER TABLE images ADD COLUMN is_favorite INTEGER DEFAULT 0")
-    except Exception:
-        pass
+    for col, default in [
+        ("is_favorite", "0"),
+        ("ai_fabric", "''"),
+        ("ai_silhouette", "''"),
+        ("ai_details", "'[]'"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE images ADD COLUMN {col} {'INTEGER' if col == 'is_favorite' else 'TEXT'} DEFAULT {default}")
+        except Exception:
+            pass
     conn.commit()
     conn.close()

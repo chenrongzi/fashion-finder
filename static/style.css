@@ -468,6 +468,12 @@ button[id="fetchBtn"] {
 
 .hidden { display: none !important; }
 
+.element-hint {
+  font-size: 13px;
+  color: #bbb;
+  font-style: italic;
+}
+
 /* ── 延展找图页 ── */
 .extend-step-card {
   background: var(--card);

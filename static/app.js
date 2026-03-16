@@ -402,6 +402,7 @@ let selectedSeedId   = null;
 let selectedSeedData = null;
 let extendCategory = 'same';
 let extendRefine   = '';
+let extendElements = new Set();  // 用户选中的元素标签
 
 // 品类选择
 document.querySelectorAll('#categoryPills .pill').forEach(btn => {
@@ -484,6 +485,36 @@ function selectSeed(img) {
     </div>
   `;
 
+  // 渲染元素标签（材质 + 版型 + 设计细节）
+  extendElements.clear();
+  const elementPills = document.getElementById('elementPills');
+  const allElements = [
+    ...(img.ai_fabric ? [img.ai_fabric] : []),
+    ...(img.ai_silhouette ? [img.ai_silhouette] : []),
+    ...(img.ai_details || []),
+  ].filter(Boolean);
+
+  if (allElements.length === 0) {
+    elementPills.innerHTML = '<span class="element-hint">AI未识别出具体元素</span>';
+  } else {
+    elementPills.innerHTML = allElements.map(el =>
+      `<button class="pill element-pill" data-val="${escHtml(el)}">${escHtml(el)}</button>`
+    ).join('');
+    // 绑定多选事件
+    elementPills.querySelectorAll('.element-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.val;
+        if (btn.classList.contains('active')) {
+          btn.classList.remove('active');
+          extendElements.delete(val);
+        } else {
+          btn.classList.add('active');
+          extendElements.add(val);
+        }
+      });
+    });
+  }
+
   // 滚到第二步
   document.getElementById('extendStep2').scrollIntoView({ behavior: 'smooth' });
 }
@@ -516,6 +547,7 @@ document.getElementById('extendSearchBtn').addEventListener('click', async () =>
         image_id: selectedSeedId,
         category: extendCategory,
         refine: extendRefine,
+        elements: [...extendElements],
       }),
     });
     const data = await res.json();

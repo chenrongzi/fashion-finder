@@ -51,17 +51,19 @@ async def upload_image(file: UploadFile = File(...), platform: str = "其他"):
     try:
         analysis = analyze_image(content, filename)
     except Exception as e:
-        analysis = {"tags": [], "style": "分析失败", "color": "", "category": "", "notes": str(e)}
+        analysis = {"tags": [], "style": "分析失败", "color": "", "category": "", "notes": str(e), "fabric": "", "silhouette": "", "details": []}
 
     conn = get_db()
     cur = conn.execute(
-        """INSERT INTO images (filename, source_platform, ai_tags, ai_style, ai_color, ai_category, ai_notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO images (filename, source_platform, ai_tags, ai_style, ai_color, ai_category, ai_notes, ai_fabric, ai_silhouette, ai_details)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             filename, platform,
             json.dumps(analysis.get("tags", []), ensure_ascii=False),
             analysis.get("style", ""), analysis.get("color", ""),
             analysis.get("category", ""), analysis.get("notes", ""),
+            analysis.get("fabric", ""), analysis.get("silhouette", ""),
+            json.dumps(analysis.get("details", []), ensure_ascii=False),
         ),
     )
     conn.commit()
@@ -97,23 +99,26 @@ async def fetch_url(req: FetchUrlReq):
     try:
         analysis = analyze_image(content, filename)
     except Exception as e:
-        analysis = {"tags": [], "style": "分析失败", "color": "", "category": "", "notes": str(e)}
+        analysis = {"tags": [], "style": "分析失败", "color": "", "category": "", "notes": str(e), "fabric": "", "silhouette": "", "details": []}
 
     conn = get_db()
     cur = conn.execute(
-        """INSERT INTO images (filename, source_url, source_platform, ai_tags, ai_style, ai_color, ai_category, ai_notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO images (filename, source_url, source_platform, ai_tags, ai_style, ai_color, ai_category, ai_notes, ai_fabric, ai_silhouette, ai_details)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             filename, req.url, req.platform,
             json.dumps(analysis.get("tags", []), ensure_ascii=False),
             analysis.get("style", ""), analysis.get("color", ""),
             analysis.get("category", ""), analysis.get("notes", ""),
+            analysis.get("fabric", ""), analysis.get("silhouette", ""),
+            json.dumps(analysis.get("details", []), ensure_ascii=False),
         ),
     )
     conn.commit()
     image_id = cur.lastrowid
     row = dict(conn.execute("SELECT * FROM images WHERE id = ?", (image_id,)).fetchone())
     row["ai_tags"] = json.loads(row["ai_tags"] or "[]")
+    row["ai_details"] = json.loads(row.get("ai_details") or "[]")
     conn.close()
     return {"id": image_id, "filename": filename, "analysis": analysis, "image": row}
 
@@ -148,6 +153,10 @@ def get_images(status: str = None, platform: str = None, favorite: int = None, l
             d["ai_tags"] = json.loads(d["ai_tags"] or "[]")
         except Exception:
             d["ai_tags"] = []
+        try:
+            d["ai_details"] = json.loads(d.get("ai_details") or "[]")
+        except Exception:
+            d["ai_details"] = []
         result.append(d)
     return {"items": result, "total": total}
 
@@ -249,26 +258,30 @@ KEYWORD_PROMPT = """你是专业女装设计师，帮设计师在Google图片上
 要求：
 1. 每组关键词要具体，包含【具体单品名称】+【氛围/风格词】，不要只写风格标签
 2. 中英文混搭效果更好（比如"法式碎花连衣裙 editorial"比"法式风格"好得多）
-3. 加上场景词/平台词：lookbook、outfit、editorial、ins风、穿搭、小红书风、
+3. 加上场景词/平台词：lookbook、outfit、editorial、ins风、穿搭、小红书风
 4. 品类要对上目标品类：{target_category}
 5. 如果有调整方向"{refine}"，体现在关键词里（比如"设计师款""小众""2024新款"）
-6. 禁止直接把风格描述原封不动写成关键词（"法式慵懒风"这种太宽泛，没用）
+6. 如果有用户指定的元素"{elements}"，必须把这些元素词融入关键词中
+7. 禁止直接把风格描述原封不动写成关键词（"法式慵懒风"这种太宽泛，没用）
 
 图片信息：
 - 风格描述：{style}
 - 标签：{tags}
 - 品类：{category}
 - 色调：{color}
+- 材质：{fabric}
+- 版型：{silhouette}
+- 设计细节：{details}
 - 设计亮点：{notes}
 
 只返回JSON数组，4个元素，不要其他内容：
 ["关键词组1","关键词组2","关键词组3","关键词组4"]
 
-示例（法式复古连衣裙，找同款）：
-["法式复古碎花连衣裙 小众设计","vintage floral midi dress editorial","慵懒法式穿搭 氛围感outfit","French girl dress lookbook ins风"]"""
+示例（针织开衫，找配裤子，更高级）：
+["针织开衫 高级感 阔腿裤搭配","knit cardigan wide leg pants editorial","小众针织开衫穿搭 设计感","vintage knit outfit lookbook ins风"]"""
 
 
-def generate_keywords(img: dict, target_category: str, refine: str) -> list[str]:
+def generate_keywords(img: dict, target_category: str, refine: str, elements: list[str]) -> list[str]:
     """用AI根据图片分析结果生成搜索关键词"""
     cat_label = CATEGORY_KEYWORDS.get(target_category, "同风格服装")
     refine_label = REFINE_KEYWORDS.get(refine, "")
@@ -278,9 +291,13 @@ def generate_keywords(img: dict, target_category: str, refine: str) -> list[str]
         tags=", ".join(json.loads(img.get("ai_tags", "[]") or "[]")),
         category=img.get("ai_category", ""),
         color=img.get("ai_color", ""),
+        fabric=img.get("ai_fabric", ""),
+        silhouette=img.get("ai_silhouette", ""),
+        details=", ".join(json.loads(img.get("ai_details", "[]") or "[]")),
         notes=img.get("ai_notes", ""),
         target_category=cat_label,
         refine=refine_label or "无",
+        elements=", ".join(elements) if elements else "无",
     )
 
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
@@ -337,8 +354,9 @@ def serper_search(query: str, num: int = 10) -> list[dict]:
 
 class ExtendReq(BaseModel):
     image_id: int
-    category: str = "same"   # same/top/pants/skirt/dress/coat/suit
-    refine: str = ""          # premium/new/unique/summer/""
+    category: str = "same"        # same/top/pants/skirt/dress/coat/suit
+    refine: str = ""               # premium/new/unique/summer/""
+    elements: list[str] = []       # 用户选择的元素标签（材质/版型/细节）
 
 
 @app.post("/api/search/extend")
@@ -356,16 +374,11 @@ def extend_search(req: ExtendReq):
     img = dict(row)
 
     # 生成搜索关键词
-    keywords = generate_keywords(img, req.category, req.refine)
+    keywords = generate_keywords(img, req.category, req.refine, req.elements)
     if not keywords:
-        # 兜底：直接用AI分析结果拼关键词
         cat_label = CATEGORY_KEYWORDS.get(req.category, "")
         style = img.get("ai_style", "")
         keywords = [f"{style} {cat_label}".strip()] if style else [cat_label]
-
-    # 附加品类和refine修饰词
-    refine_suffix = REFINE_KEYWORDS.get(req.refine, "")
-    cat_suffix = CATEGORY_KEYWORDS.get(req.category, "")
 
     results = []
     seen_urls = set()
