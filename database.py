@@ -27,8 +27,14 @@ def init_db():
             ai_color TEXT DEFAULT '',
             ai_category TEXT DEFAULT '',
             ai_notes TEXT DEFAULT '',
-            user_notes TEXT DEFAULT ''
+            user_notes TEXT DEFAULT '',
+            is_favorite INTEGER DEFAULT 0
         )
     """)
+    # 兼容旧数据库：补充字段（若已存在则忽略）
+    try:
+        conn.execute("ALTER TABLE images ADD COLUMN is_favorite INTEGER DEFAULT 0")
+    except Exception:
+        pass
     conn.commit()
     conn.close()

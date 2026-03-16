@@ -19,6 +19,7 @@
 <!-- Tab 导航 -->
 <nav class="tabs">
   <button class="tab active" data-tab="upload">上传图片</button>
+  <button class="tab" data-tab="extend">延展找图 ✨</button>
   <button class="tab" data-tab="gallery">图库</button>
 </nav>
 
@@ -70,6 +71,73 @@
 
 </section>
 
+<!-- ── 延展找图页 ── -->
+<section id="tab-extend" class="tab-content">
+
+  <!-- 第一步：选参考图 -->
+  <div class="extend-step-card" id="extendStep1">
+    <div class="step-label">第一步：选一张对味的参考图</div>
+    <div class="seed-picker" id="seedPicker">
+      <div class="seed-empty" id="seedEmpty">
+        <div style="font-size:36px;margin-bottom:8px;">🖼️</div>
+        <div>从图库里选一张"对味"的图</div>
+        <div style="font-size:13px;color:#aaa;margin-top:4px;">点击下方图片选择</div>
+      </div>
+      <div id="seedSelected" class="seed-selected hidden"></div>
+    </div>
+
+    <!-- 缩略图库 -->
+    <div id="seedGallery" class="seed-gallery"></div>
+    <button id="seedLoadMore" class="seed-load-more hidden">加载更多</button>
+  </div>
+
+  <!-- 第二步：配置延展方向 -->
+  <div class="extend-step-card" id="extendStep2">
+    <div class="step-label">第二步：想找什么？</div>
+
+    <div class="option-section">
+      <div class="option-title">延展方向</div>
+      <div class="option-pills" id="categoryPills">
+        <button class="pill active" data-val="same">同风格相似款</button>
+        <button class="pill" data-val="top">配上衣</button>
+        <button class="pill" data-val="pants">配裤子</button>
+        <button class="pill" data-val="skirt">配裙子</button>
+        <button class="pill" data-val="dress">配连衣裙</button>
+        <button class="pill" data-val="coat">配外套</button>
+        <button class="pill" data-val="suit">找套装</button>
+      </div>
+    </div>
+
+    <div class="option-section">
+      <div class="option-title">调整方向（可选）</div>
+      <div class="option-pills" id="refinePills">
+        <button class="pill" data-val="">不限</button>
+        <button class="pill" data-val="premium">更高级</button>
+        <button class="pill" data-val="new">更新更潮</button>
+        <button class="pill" data-val="unique">不普通</button>
+        <button class="pill" data-val="summer">夏款</button>
+      </div>
+    </div>
+
+    <button class="extend-btn" id="extendSearchBtn">🔍 开始找图</button>
+  </div>
+
+  <!-- 搜索结果 -->
+  <div id="extendResults" class="hidden">
+    <div class="results-header">
+      <div id="resultsTitle" class="results-title"></div>
+      <div id="resultsKeywords" class="results-keywords"></div>
+    </div>
+    <div id="resultsLoading" class="results-loading hidden">
+      <div class="loading-spinner"></div>
+      <div>AI正在找图，稍等一下...</div>
+    </div>
+    <div id="resultsGrid" class="results-grid"></div>
+    <div id="resultsEmpty" class="empty-tip hidden">没找到合适的，换个关键词试试？</div>
+  </div>
+
+</section>
+
 <!-- ── 图库页 ── -->
 <section id="tab-gallery" class="tab-content">
 
@@ -80,6 +148,7 @@
     <button class="filter-btn" data-status="sent">已发老板娘</button>
     <button class="filter-btn" data-status="approved">通过 ✅</button>
     <button class="filter-btn" data-status="rejected">拒绝 ❌</button>
+    <button class="filter-btn" data-status="favorite">收藏 ❤️</button>
     <button class="filter-btn select-toggle" id="selectModeBtn">多选</button>
   </div>
 
@@ -106,6 +175,16 @@
     <button class="modal-close" id="modalClose">✕</button>
     <img id="modalImg" src="" alt="">
     <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- ── 外部图片预览弹窗 ── -->
+<div id="extModal" class="modal hidden">
+  <div class="modal-backdrop" id="extModalBackdrop"></div>
+  <div class="modal-card">
+    <button class="modal-close" id="extModalClose">✕</button>
+    <img id="extModalImg" src="" alt="" style="max-height:55vh">
+    <div class="modal-body" id="extModalBody"></div>
   </div>
 </div>
 

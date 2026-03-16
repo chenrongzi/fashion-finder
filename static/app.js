@@ -12,7 +12,7 @@ const STATUS_MAP = {
 let galleryOffset = 0;
 let galleryStatus = '';
 let galleryTotal  = 0;
-let currentModal  = null;  // 当前详情弹窗的图片 id
+let currentModal  = null;
 
 // ── Tab 切换 ─────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(btn => {
@@ -21,6 +21,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'gallery') loadGallery(true);
+    if (btn.dataset.tab === 'extend') loadSeedGallery(true);
   });
 });
 
@@ -191,14 +192,23 @@ function showAnalysis(data, imgSrc) {
     <div class="ai-meta">${escHtml(a.category || '')}  ${escHtml(a.color || '')}</div>
     <div class="tags">${(a.tags || []).map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}</div>
     <div class="ai-notes">${escHtml(a.notes || '')}</div>
+    <button class="extend-quick-btn" onclick="quickExtend(${data.id})">✨ 以此图延展找同风格</button>
   `;
   card.scrollIntoView({ behavior: 'smooth' });
 }
 
+function quickExtend(imageId) {
+  // 跳到延展Tab并选中此图
+  document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelector('[data-tab="extend"]').classList.add('active');
+  document.getElementById('tab-extend').classList.add('active');
+  loadSeedGallery(true, imageId);
+}
+
 // ── 图库 ─────────────────────────────────────────────────
-document.querySelectorAll('.filter-btn').forEach(btn => {
+document.querySelectorAll('.filter-btn:not(.select-toggle)').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.filter-btn:not(.select-toggle)').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     galleryStatus = btn.dataset.status;
     loadGallery(true);
@@ -211,7 +221,13 @@ async function loadGallery(reset = false) {
     document.getElementById('gallery').innerHTML = '';
   }
 
-  const url = `${API}/api/images?limit=20&offset=${galleryOffset}${galleryStatus ? '&status=' + galleryStatus : ''}`;
+  let url;
+  if (galleryStatus === 'favorite') {
+    url = `${API}/api/images?limit=20&offset=${galleryOffset}&favorite=1`;
+  } else {
+    url = `${API}/api/images?limit=20&offset=${galleryOffset}${galleryStatus ? '&status=' + galleryStatus : ''}`;
+  }
+
   const data = await fetch(url).then(r => r.json());
   galleryTotal = data.total;
 
@@ -243,10 +259,12 @@ function makeGalleryItem(img) {
   el.dataset.id = img.id;
   const s = STATUS_MAP[img.status] || STATUS_MAP.pending;
   const tags = (img.ai_tags || []).slice(0, 2).join(' · ');
+  const favHeart = img.is_favorite ? '❤️' : '';
   el.innerHTML = `
     <img src="/uploads/${escHtml(img.filename)}" alt="" loading="lazy">
     <span class="select-check"></span>
     <span class="status-badge ${s.cls}">${s.label}</span>
+    ${favHeart ? `<span class="fav-badge">${favHeart}</span>` : ''}
     <div class="gallery-item-info">
       <div class="gallery-item-style">${escHtml(img.ai_style || '—')}</div>
       <div class="gallery-item-meta">${escHtml(tags || img.source_platform || '')}</div>
@@ -281,12 +299,18 @@ function openModal(img) {
 function renderModalBody(img) {
   const s = STATUS_MAP[img.status] || STATUS_MAP.pending;
   const tags = (img.ai_tags || []).map(t => `<span class="tag">${escHtml(t)}</span>`).join('');
+  const isFav = img.is_favorite ? 1 : 0;
 
   modalBody.innerHTML = `
     <div class="ai-style">${escHtml(img.ai_style || '—')}</div>
     <div class="ai-meta">${escHtml(img.ai_category || '')}  ${escHtml(img.ai_color || '')}  ·  ${escHtml(img.source_platform || '')}</div>
     <div class="tags">${tags}</div>
     <div class="ai-notes">${escHtml(img.ai_notes || '')}</div>
+
+    <div class="modal-action-row">
+      <button class="fav-btn ${isFav ? 'fav-on' : ''}" id="favBtn">${isFav ? '❤️ 已收藏' : '🤍 收藏'}</button>
+      <button class="extend-modal-btn" id="extendModalBtn">✨ 以此延展</button>
+    </div>
 
     <div class="section-title">审核状态</div>
     <div class="status-buttons">
@@ -302,6 +326,26 @@ function renderModalBody(img) {
     <button class="delete-btn">删除这张图</button>
   `;
 
+  // 收藏按钮
+  const favBtn = modalBody.querySelector('#favBtn');
+  favBtn.addEventListener('click', async () => {
+    const newVal = !img.is_favorite;
+    await fetch(`${API}/api/images/${img.id}/favorite`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_favorite: newVal }),
+    });
+    img.is_favorite = newVal;
+    renderModalBody(img);
+    showToast(newVal ? '已收藏 ❤️' : '已取消收藏');
+  });
+
+  // 以此延展
+  modalBody.querySelector('#extendModalBtn').addEventListener('click', () => {
+    closeModal();
+    quickExtend(img.id);
+  });
+
   // 状态按钮
   modalBody.querySelectorAll('.status-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -312,7 +356,6 @@ function renderModalBody(img) {
       });
       img.status = btn.dataset.s;
       renderModalBody(img);
-      refreshGalleryItem(img);
       loadStats();
     });
   });
@@ -339,21 +382,260 @@ function renderModalBody(img) {
   });
 }
 
-// 刷新图库里对应的卡片状态
-function refreshGalleryItem(img) {
-  loadGallery(true);
-}
-
 // 上传完成后立刻把新图插到图库最前面
 function prependToGallery(img) {
   const grid = document.getElementById('gallery');
   document.getElementById('galleryEmpty').classList.add('hidden');
-  // 如果有筛选且不是"全部"，新图是 pending 状态，只在全部/pending 时插入
   if (galleryStatus === '' || galleryStatus === 'pending') {
     grid.prepend(makeGalleryItem(img));
     galleryOffset += 1;
   }
 }
+
+// ══════════════════════════════════════════════════════════
+// ── 延展找图功能 ──────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+let seedOffset = 0;
+let seedTotal  = 0;
+let selectedSeedId   = null;
+let selectedSeedData = null;
+let extendCategory = 'same';
+let extendRefine   = '';
+
+// 品类选择
+document.querySelectorAll('#categoryPills .pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#categoryPills .pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    extendCategory = btn.dataset.val;
+  });
+});
+
+// Refine 选择（单选，可取消）
+document.querySelectorAll('#refinePills .pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#refinePills .pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    extendRefine = btn.dataset.val;
+  });
+});
+
+// 默认选中"不限"
+document.querySelector('#refinePills .pill[data-val=""]').classList.add('active');
+
+async function loadSeedGallery(reset = false, autoSelectId = null) {
+  if (reset) {
+    seedOffset = 0;
+    document.getElementById('seedGallery').innerHTML = '';
+  }
+
+  const data = await fetch(`${API}/api/images?limit=12&offset=${seedOffset}`).then(r => r.json());
+  seedTotal = data.total;
+
+  const grid = document.getElementById('seedGallery');
+  const loadMore = document.getElementById('seedLoadMore');
+
+  data.items.forEach(img => {
+    const el = document.createElement('div');
+    el.className = 'seed-thumb' + (selectedSeedId === img.id ? ' selected' : '');
+    el.dataset.id = img.id;
+    el.innerHTML = `<img src="/uploads/${escHtml(img.filename)}" alt="" loading="lazy">`;
+    el.addEventListener('click', () => selectSeed(img));
+    grid.appendChild(el);
+  });
+
+  seedOffset += data.items.length;
+
+  if (seedOffset < seedTotal) {
+    loadMore.classList.remove('hidden');
+    loadMore.onclick = () => loadSeedGallery(false);
+  } else {
+    loadMore.classList.add('hidden');
+  }
+
+  // 自动选中
+  if (autoSelectId) {
+    const img = data.items.find(i => i.id === autoSelectId);
+    if (img) selectSeed(img);
+  }
+}
+
+function selectSeed(img) {
+  selectedSeedId = img.id;
+  selectedSeedData = img;
+
+  // 高亮选中
+  document.querySelectorAll('.seed-thumb').forEach(el => {
+    el.classList.toggle('selected', Number(el.dataset.id) === img.id);
+  });
+
+  // 显示选中预览
+  const tags = (img.ai_tags || []).slice(0, 3).map(t => `<span class="tag">${escHtml(t)}</span>`).join('');
+  document.getElementById('seedEmpty').classList.add('hidden');
+  const sel = document.getElementById('seedSelected');
+  sel.classList.remove('hidden');
+  sel.innerHTML = `
+    <img src="/uploads/${escHtml(img.filename)}" alt="">
+    <div class="seed-info">
+      <div class="ai-style">${escHtml(img.ai_style || '—')}</div>
+      <div class="tags">${tags}</div>
+      <div class="ai-notes" style="font-size:12px;color:#888;margin-top:4px">${escHtml(img.ai_notes || '')}</div>
+    </div>
+  `;
+
+  // 滚到第二步
+  document.getElementById('extendStep2').scrollIntoView({ behavior: 'smooth' });
+}
+
+// 开始搜索
+document.getElementById('extendSearchBtn').addEventListener('click', async () => {
+  if (!selectedSeedId) {
+    showToast('请先选一张参考图 👆');
+    return;
+  }
+
+  const resultsDiv = document.getElementById('extendResults');
+  const loading    = document.getElementById('resultsLoading');
+  const grid       = document.getElementById('resultsGrid');
+  const empty      = document.getElementById('resultsEmpty');
+
+  resultsDiv.classList.remove('hidden');
+  loading.classList.remove('hidden');
+  grid.innerHTML = '';
+  empty.classList.add('hidden');
+  document.getElementById('resultsTitle').textContent = '';
+  document.getElementById('resultsKeywords').textContent = '';
+  resultsDiv.scrollIntoView({ behavior: 'smooth' });
+
+  try {
+    const res = await fetch(`${API}/api/search/extend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image_id: selectedSeedId,
+        category: extendCategory,
+        refine: extendRefine,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || '搜索失败');
+
+    loading.classList.add('hidden');
+
+    const catLabels = {
+      same:'同风格相似款', top:'配上衣', pants:'配裤子',
+      skirt:'配裙子', dress:'配连衣裙', coat:'配外套', suit:'找套装',
+    };
+    document.getElementById('resultsTitle').textContent =
+      `基于「${data.seed_style || '参考图'}」 → ${catLabels[extendCategory] || ''}`;
+    if (data.keywords_used?.length) {
+      document.getElementById('resultsKeywords').textContent =
+        '搜索关键词：' + data.keywords_used.join(' · ');
+    }
+
+    if (!data.results || data.results.length === 0) {
+      empty.classList.remove('hidden');
+      return;
+    }
+
+    data.results.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'result-item';
+      el.innerHTML = `
+        <img src="${escHtml(item.thumbnail || item.image_url)}" alt="" loading="lazy"
+             onerror="this.src='${escHtml(item.image_url)}';this.onerror=null">
+        <div class="result-overlay">
+          <button class="result-save-btn" title="保存到图库">💾</button>
+          <button class="result-open-btn" title="查看原图">🔗</button>
+        </div>
+        <div class="result-title">${escHtml(item.title || '')}</div>
+      `;
+
+      // 保存到图库
+      el.querySelector('.result-save-btn').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const btn = e.currentTarget;
+        btn.textContent = '⏳';
+        btn.disabled = true;
+        try {
+          const r = await fetch(`${API}/api/images/fetch-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: item.image_url, platform: '延展搜索' }),
+          });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.detail || '失败');
+          btn.textContent = '✅';
+          showToast('已保存到图库');
+          loadStats();
+        } catch (err) {
+          btn.textContent = '❌';
+          showToast('保存失败：' + err.message);
+        }
+      });
+
+      // 查看原图
+      el.querySelector('.result-open-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.open(item.source_url || item.image_url, '_blank');
+      });
+
+      // 点击预览大图
+      el.addEventListener('click', () => openExtModal(item));
+
+      grid.appendChild(el);
+    });
+
+  } catch (err) {
+    loading.classList.add('hidden');
+    empty.classList.remove('hidden');
+    empty.textContent = '搜索失败：' + err.message;
+  }
+});
+
+// ── 外部图片预览弹窗 ─────────────────────────────────────
+const extModal = document.getElementById('extModal');
+document.getElementById('extModalBackdrop').addEventListener('click', () => extModal.classList.add('hidden'));
+document.getElementById('extModalClose').addEventListener('click', () => extModal.classList.add('hidden'));
+
+function openExtModal(item) {
+  document.getElementById('extModalImg').src = item.image_url;
+  const body = document.getElementById('extModalBody');
+  body.innerHTML = `
+    <div class="ai-style" style="margin-top:10px">${escHtml(item.title || '')}</div>
+    <div class="ai-meta" style="margin-top:6px">${escHtml(item.keyword || '')}</div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="save-notes-btn" id="extSaveBtn">💾 保存到图库</button>
+      <button class="delete-btn" style="flex:1" onclick="window.open('${escHtml(item.source_url || item.image_url)}','_blank')">🔗 查看来源</button>
+    </div>
+  `;
+  body.querySelector('#extSaveBtn').addEventListener('click', async () => {
+    const btn = body.querySelector('#extSaveBtn');
+    btn.textContent = '⏳ 保存中...';
+    btn.disabled = true;
+    try {
+      const r = await fetch(`${API}/api/images/fetch-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: item.image_url, platform: '延展搜索' }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail);
+      btn.textContent = '✅ 已保存';
+      showToast('已保存到图库');
+      loadStats();
+    } catch (err) {
+      btn.textContent = '❌ 失败';
+      showToast('保存失败');
+    }
+  });
+  extModal.classList.remove('hidden');
+}
+
+// ══════════════════════════════════════════════════════════
+// ── 图库 api：支持收藏筛选 ────────────────────────────────
+// ══════════════════════════════════════════════════════════
 
 // ── 工具函数 ─────────────────────────────────────────────
 function escHtml(s) {
@@ -389,7 +671,6 @@ function enterSelectMode() {
   selectModeBtn.textContent = '退出';
   batchBar.classList.remove('hidden');
   updateBatchBar();
-  // 给所有图片卡片加 selectable 样式
   document.querySelectorAll('.gallery-item').forEach(el => {
     el.classList.add('selectable');
     el.classList.remove('selected');
@@ -416,7 +697,6 @@ function updateBatchBar() {
       ? '取消全选' : '全选';
 }
 
-// 全选 / 取消全选
 batchSelectAll.addEventListener('click', () => {
   const items = document.querySelectorAll('.gallery-item');
   const allSelected = [...items].every(el => el.classList.contains('selected'));
@@ -453,10 +733,6 @@ batchDeleteBtn.addEventListener('click', async () => {
   loadStats();
 });
 
-// makeGalleryItem 需要支持多选点击，重新封装点击逻辑
-// 在原有 makeGalleryItem 基础上，进入多选模式后拦截点击
-const _origMakeGalleryItem = makeGalleryItem;
-// 直接改 gallery 的事件委托更干净
 document.getElementById('gallery').addEventListener('click', e => {
   if (!selectMode) return;
   const item = e.target.closest('.gallery-item');
@@ -473,4 +749,4 @@ document.getElementById('gallery').addEventListener('click', e => {
     selectedIds.add(id);
   }
   updateBatchBar();
-}, true);  // 捕获阶段拦截，阻止打开详情
+}, true);
